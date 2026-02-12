@@ -154,16 +154,67 @@ else:
         with st.expander("🔗 Ver Fontes Originais"):
             for i in st.session_state.get('indices_fontes', []):
                 st.caption(df.iloc[i]['Conteúdo'])
-
-    # --- 3. RODAPÉ (TOTALMENTE NA MARGEM ESQUERDA) ---
-        st.markdown("<br><br>", unsafe_allow_html=True)
+    if df is not None and api_key:
+    genai.configure(api_key=api_key)
+    try:
+        modelos = [m.name for m in genai.list_models() if "gemini" in m.name.lower()]
+        modelo_escolhido = st.selectbox("Motor da IA:", modelos)
+        
         st.divider()
-        st.markdown(
-        """
-        <div style='text-align: center; color: #666; font-size: 0.9rem; padding: 20px;'>
+        pergunta = st.text_input("O que deseja decifrar na Constituição?")
+
+        # --- BLOCO 1: PROCESSAMENTO (Só acontece no clique) ---
+        if st.button("Analisar Agora 🚀") and pergunta:
+            with st.spinner('O Lex-IA está elaborando o parecer...'):
+                vectorizer = TfidfVectorizer(
+                    stop_words=['de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'uma', 'os', 'as', 'no', 'na', 'artigo', 'parágrafo', 'inciso', 'constituição', 'regras', 'sobre'],
+                    max_df=0.2, ngram_range=(1, 2), sublinear_tf=True
+                )
+                tfidf_matrix = vectorizer.fit_transform(df['Conteúdo'].fillna(''))
+                pergunta_vec = vectorizer.transform([pergunta])
+                similares = cosine_similarity(pergunta_vec, tfidf_matrix).flatten()
+                indices = similares.argsort()[-10:][::-1]
+                contexto = "\n".join([f"Artigo: {df.iloc[i]['Conteúdo']}" for i in indices[:top_k]])
+
+                model = genai.GenerativeModel(modelo_escolhido)
+                prompt = f"Você é o Lex-IA 2.0, consultor sênior. Responda de forma executiva, polida e em tópicos. Contexto: {contexto}. Pergunta: {pergunta}"
+                response = model.generate_content(prompt)
+                
+                # Salvamos na sessão
+                st.session_state.ultima_resposta = response.text
+                st.session_state.indices_fontes = indices[:top_k]
+                st.session_state.historico.append({"pergunta": pergunta, "resposta": response.text})
+                st.rerun()
+
+        # --- BLOCO 2: EXIBIÇÃO (Alinhado com a 'pergunta', FORA do botão) ---
+        if st.session_state.get('ultima_resposta'):
+            st.divider()
+            st.markdown("### 📝 Parecer Técnico")
+            st.info("💡 **Dica:** Para copiar o parecer, use o botão no canto superior direito da caixa cinza.")
+            
+            st.code(st.session_state.ultima_resposta, language="text")
+            
+            st.divider()
+            with st.expander("🔗 Ver Fontes Originais"):
+                indices_para_exibir = st.session_state.get('indices_fontes', [])
+                for i in indices_para_exibir:
+                    st.caption(df.iloc[i]['Conteúdo'])
+
+    except Exception as e:
+        st.error(f"Erro técnico: {e}")
+
+else:
+    st.info("👋 Olá! Insira sua API Key na barra lateral para começar.")
+
+# --- BLOCO 3: RODAPÉ (TOTALMENTE À ESQUERDA) ---
+st.markdown("<br><br>", unsafe_allow_html=True)
+st.divider()
+st.markdown(
+    """
+    <div style='text-align: center; color: #666; font-size: 0.9rem; padding: 20px;'>
         Desenvolvido por <b>Maurício Taveira</b> | 2026 <br>
         <span style='color: #4facfe;'>Lex-IA 2.0 Pro</span> - Inteligência Artificial aplicada ao Direito
-        </div>
-         """,
-        unsafe_allow_html=True
+    </div>
+    """,
+    unsafe_allow_html=True
 )
