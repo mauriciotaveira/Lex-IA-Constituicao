@@ -4,114 +4,106 @@ import google.generativeai as genai
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# --- 1. CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Lex-IA 2.0", page_icon="⚖️", layout="wide")
+# --- 1. CONFIGURAÇÃO E ESTILO ---
+st.set_page_config(page_title="Lex-IA 2.0 Pro", page_icon="⚖️", layout="wide")
 
-# --- 2. ESTILO CSS (O BANHO DE LOJA) ---
+# Inicializa o histórico na memória da sessão
+if 'historico' not in st.session_state:
+    st.session_state.historico = []
+
 st.markdown("""
     <style>
-    /* Fundo e Fonte */
     .main { background-color: #0e1117; color: #ffffff; }
-    
-    /* Título com Degradê */
     .titulo-moderno {
         background: -webkit-linear-gradient(#00f2fe, #4facfe);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         font-size: 3rem;
         font-weight: 800;
-        margin-bottom: 0px;
     }
-    
-    /* Botão estilizado */
     .stButton>button {
         background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
-        color: white;
-        border: none;
-        padding: 15px 32px;
-        font-weight: bold;
-        border-radius: 12px;
-        transition: 0.3s;
+        color: white; border: none; border-radius: 12px; font-weight: bold;
     }
-    .stButton>button:hover {
-        transform: scale(1.02);
-        box-shadow: 0px 5px 15px rgba(79, 172, 254, 0.4);
+    .card-historico {
+        background-color: #1e2130;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        border-left: 5px solid #4facfe;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. CARREGAMENTO E MOTOR ---
+# --- 2. CARREGAMENTO ---
 @st.cache_data
 def carregar_dados():
-    try:
-        return pd.read_excel("Constituicao_Mestra_V2.xlsx")
+    try: return pd.read_excel("Constituicao_Mestra_V2.xlsx")
     except: return None
 
 df = carregar_dados()
 
-# --- 4. BARRA LATERAL ---
+# --- 3. BARRA LATERAL (CONFIGS + HISTÓRICO) ---
 with st.sidebar:
     st.markdown("### 🛠️ Lab de IA")
     api_key = st.text_input("Sua Gemini Key", type="password")
-    top_k = st.slider("Profundidade da análise", 1, 5, 3)
+    top_k = st.slider("Profundidade", 1, 5, 3)
+    
     st.divider()
-    st.write("🤖 **Versão:** 2.5 Flash Ativa")
+    st.markdown("### 📜 Histórico de Consultas")
+    if not st.session_state.historico:
+        st.caption("Nenhuma consulta realizada ainda.")
+    else:
+        for idx, item in enumerate(reversed(st.session_state.historico)):
+            with st.expander(f"🔍 {item['pergunta'][:30]}..."):
+                st.write(item['resposta'])
+                if st.button("Limpar este", key=f"del_{idx}"):
+                    st.session_state.historico.pop(len(st.session_state.historico) - 1 - idx)
+                    st.rerun()
 
-# --- 5. INTERFACE ---
-st.markdown('<p class="titulo-moderno">Lex-IA 2.0</p>', unsafe_allow_html=True)
-st.markdown("#### Seu Consultor Jurídico Ágil e Inteligente")
+# --- 4. INTERFACE PRINCIPAL ---
+st.markdown('<p class="titulo-moderno">Lex-IA 2.0 Pro</p>', unsafe_allow_html=True)
 
 if df is not None and api_key:
-    # Diagnóstico de Modelos
+    genai.configure(api_key=api_key)
     try:
-        genai.configure(api_key=api_key)
         modelos = [m.name for m in genai.list_models() if "gemini" in m.name.lower()]
-        modelo_escolhido = st.selectbox("Escolha o motor da IA:", modelos)
+        modelo_escolhido = st.selectbox("Motor da IA:", modelos)
         
         st.divider()
-        pergunta = st.text_input("O que você quer decifrar na Constituição hoje?", placeholder="Ex: Direitos trabalhistas de forma resumida...")
+        pergunta = st.text_input("O que deseja decifrar na Constituição?")
 
         if st.button("Analisar Agora 🚀") and pergunta:
-            # Busca RAG
-            vectorizer = TfidfVectorizer(max_df=0.4, min_df=2)
+            # Busca RAG Turbo
+            vectorizer = TfidfVectorizer(
+                stop_words=['de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'uma', 'os', 'as', 'no', 'na', 'artigo', 'parágrafo', 'inciso', 'constituição', 'regras', 'sobre'],
+                max_df=0.2, ngram_range=(1, 2), sublinear_tf=True
+            )
             tfidf_matrix = vectorizer.fit_transform(df['Conteúdo'].fillna(''))
             pergunta_vec = vectorizer.transform([pergunta])
             similares = cosine_similarity(pergunta_vec, tfidf_matrix).flatten()
-            indices = similares.argsort()[-top_k:][::-1]
-            contexto = "\n".join([f"Artigo: {df.iloc[i]['Conteúdo']}" for i in indices])
-            
-            # IA - PROMPT MODERNO (PERSONALIDADE REFINADA)
-            with st.spinner('O Lex-IA está elaborando o parecer técnico...'):
+            indices = similares.argsort()[-10:][::-1]
+            contexto = "\n".join([f"Artigo: {df.iloc[i]['Conteúdo']}" for i in indices[:top_k]])
+
+            with st.spinner('Elaborando parecer...'):
                 model = genai.GenerativeModel(modelo_escolhido)
+                prompt = f"Você é o Lex-IA 2.0, consultor jurídico sênior. Use tom cordial e executivo, bullet points e negrito. Contexto: {contexto}. Pergunta: {pergunta}"
+                response = model.generate_content(prompt)
                 
-                prompt_moderno = f"""
-                Você é o Lex-IA 2.0, um Consultor Jurídico Digital de alto nível. 
-                Sua missão é explicar a Constituição de forma clara, moderna e extremamente profissional.
+                # Salva no Histórico
+                st.session_state.historico.append({"pergunta": pergunta, "resposta": response.text})
+                
+                # Exibe Resposta
+                st.markdown("### 📝 Parecer Técnico:")
+                st.write(response.text)
+                
+                # FUNÇÃO COPIAR (Usando componente de código para facilitar cópia nativa)
+                st.info("💡 Você pode copiar o parecer abaixo clicando no ícone no canto superior direito:")
+                st.code(response.text, language="text")
 
-                DIRETRIZES DE PERSONALIDADE:
-                1. Comece de forma cordial, ex: "Olá! Vamos analisar o que a Constituição diz sobre..."
-                2. JAMAIS use gírias ou expressões como "meu camarada", "bora", "sem caretagem" ou "a parada é".
-                3. Use um tom de consultoria executiva: polido, objetivo e respeitoso.
-                4. Organize a resposta em tópicos (bullet points) para facilitar a leitura.
-                5. Destaque conceitos fundamentais em **negrito**.
-
-                CONTEXTO CONSTITUCIONAL:
-                {contexto}
-
-                PERGUNTA DO USUÁRIO:
-                {pergunta}
-                """
-                
-                response = model.generate_content(prompt_moderno)
-                
-                st.markdown("### 📝 O que eu encontrei:")
-                st.markdown(response.text)
-                
-                with st.expander("🔗 Ver fontes originais"):
-                    for i in indices:
-                        st.caption(df.iloc[i]['Conteúdo'])
-                        
-    except Exception as e:
-        st.error(f"Erro na conexão: {e}")
+                with st.expander("🔗 Fontes Originais"):
+                    for i in indices[:top_k]: st.caption(df.iloc[i]['Conteúdo'])
+                    
+    except Exception as e: st.error(f"Erro: {e}")
 else:
-    st.info("👋 Olá! Insira sua API Key na esquerda para começarmos a consulta.")
+    st.info("👋 Insira sua API Key para começar.")
