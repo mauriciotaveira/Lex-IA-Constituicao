@@ -117,8 +117,45 @@ else:
         st.error(f"Erro na conexão com a IA: {e}")
 else:
     st.info("👋 Olá! Insira sua API Key na barra lateral para começarmos a consulta.")
+# --- ENTRADA DO USUÁRIO ---
+    pergunta = st.text_input("O que deseja decifrar na Constituição?")
 
-# --- RODAPÉ (FORA DE TODOS OS BLOCOS IF) ---
+    # 1. BLOCO DE PROCESSAMENTO (Dentro do 'if st.button')
+    if st.button("Analisar Agora 🚀") and pergunta:
+        with st.spinner('O Lex-IA está elaborando o parecer...'):
+            vectorizer = TfidfVectorizer(
+                stop_words=['de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'uma', 'os', 'as', 'no', 'na', 'artigo', 'parágrafo', 'inciso', 'constituição', 'regras', 'sobre'],
+                max_df=0.2, ngram_range=(1, 2), sublinear_tf=True
+            )
+            tfidf_matrix = vectorizer.fit_transform(df['Conteúdo'].fillna(''))
+            pergunta_vec = vectorizer.transform([pergunta])
+            similares = cosine_similarity(pergunta_vec, tfidf_matrix).flatten()
+            indices = similares.argsort()[-10:][::-1]
+            contexto = "\n".join([f"Artigo: {df.iloc[i]['Conteúdo']}" for i in indices[:top_k]])
+
+            model = genai.GenerativeModel(modelo_escolhido)
+            prompt = f"Você é o Lex-IA 2.0, consultor sênior. Responda de forma executiva, polida e em tópicos. Contexto: {contexto}. Pergunta: {pergunta}"
+            response = model.generate_content(prompt)
+            
+            # Salvamento silencioso
+            st.session_state.ultima_resposta = response.text
+            st.session_state.indices_fontes = indices[:top_k]
+            st.session_state.historico.append({"pergunta": pergunta, "resposta": response.text})
+            st.rerun()
+
+    # 2. BLOCO DE EXIBIÇÃO (Alinhado com o botão acima, FORA dele)
+    if st.session_state.get('ultima_resposta'):
+        st.divider()
+        st.markdown("### 📝 Parecer Técnico")
+        st.info("💡 **Dica:** Para copiar o parecer, use o botão que aparece no canto superior direito da caixa abaixo.")
+        st.code(st.session_state.ultima_resposta, language="text")
+        
+        st.divider()
+        with st.expander("🔗 Ver Fontes Originais"):
+            for i in st.session_state.get('indices_fontes', []):
+                st.caption(df.iloc[i]['Conteúdo'])
+
+# --- 3. RODAPÉ (TOTALMENTE NA MARGEM ESQUERDA) ---
 st.markdown("<br><br>", unsafe_allow_html=True)
 st.divider()
 st.markdown(
