@@ -98,3 +98,35 @@ if df is not None and api_key:
                 st.caption(df.iloc[i]['Conteúdo'])
 else:
     st.info("👋 Insira sua API Key para começar.")
+# --- ÁREA ÚNICA DE EXIBIÇÃO (ESTÁVEL E SEM REPETIÇÃO) ---
+        if st.session_state.get('ultima_resposta'):
+            st.divider()
+            st.markdown("### 📝 Parecer Técnico")
+            
+            st.info("💡 **Dica:** Para copiar o parecer, use o botão que aparece no canto superior direito da caixa cinza abaixo.")
+            
+            st.code(st.session_state.ultima_resposta, language="text")
+            
+            st.divider()
+            with st.expander("🔗 Ver Fontes Originais"):
+                indices_para_exibir = st.session_state.get('ultimos_indices', [])
+                for i in indices_para_exibir:
+                    st.caption(df.iloc[i]['Conteúdo'])
+    
+    except Exception as e:
+        st.error(f"Erro na conexão com a IA: {e}")
+else:
+    st.info("👋 Olá! Insira sua API Key na barra lateral para começarmos a consulta.")
+
+# --- RODAPÉ (FORA DE TODOS OS BLOCOS IF) ---
+st.markdown("<br><br>", unsafe_allow_html=True)
+st.divider()
+st.markdown(
+    """
+    <div style='text-align: center; color: #666; font-size: 0.9rem; padding: 20px;'>
+        Desenvolvido por <b>Maurício Taveira</b> | 2026 <br>
+        <span style='color: #4facfe;'>Lex-IA 2.0 Pro</span> - Inteligência Artificial aplicada ao Direito
+    </div>
+    """,
+    unsafe_allow_html=True
+)
