@@ -27,8 +27,18 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. SEGURANÇA (SECRETS) ---
+# --- 2. GESTÃO DE SEGURANÇA (HÍBRIDA) ---
+# Tenta capturar a chave automaticamente do cofre do servidor (Secrets)
 api_key = st.secrets.get("GEMINI_API_KEY")
+
+# Se a chave não for encontrada no cofre, oferece o campo manual na barra lateral
+if not api_key:
+    with st.sidebar:
+        st.markdown("### 🔑 Acesso")
+        api_key = st.text_input("Insira sua Gemini Key:", type="password")
+        if not api_key:
+            st.warning("⚠️ Chave de API não detectada. Por favor, insira uma para operar o sistema.")
+            st.stop() # Interrompe a execução até que a chave seja inserida
 
 # --- 3. DADOS ---
 @st.cache_data
@@ -115,12 +125,27 @@ if df is not None and api_key:
 else:
     st.info("👋 Olá! Insira sua API Key para começar.")
 
-# --- 7. RODAPÉ ---
+# --- 7. RODAPÉ COM AVISO LEGAL ---
 st.markdown("<br><br>", unsafe_allow_html=True)
 st.divider()
+
+# Aviso de Isenção de Responsabilidade (Disclaimer)
 st.markdown(
     """
-    <div style='text-align: center; color: #888; font-size: 0.9rem; padding: 20px;'>
+    <div style='text-align: center; color: #555; font-size: 0.8rem; padding: 0 20px; font-style: italic;'>
+        <b>Aviso Legal:</b> O Lex-IA 2.0 Pro é uma ferramenta de apoio técnico baseada em Inteligência Artificial. 
+        Suas respostas têm caráter estritamente informativo e não constituem consulta jurídica, 
+        parecer vinculante ou orientação legal oficial. Esta ferramenta não substitui, em hipótese alguma, 
+        a análise e o aconselhamento de um advogado devidamente inscrito na OAB.
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# Sua Assinatura
+st.markdown(
+    """
+    <div style='text-align: center; color: #888; font-size: 0.9rem; padding: 10px 20px;'>
         Desenvolvido por <b>Maurício Taveira</b> | 2026 <br>
         <span style='color: #4facfe;'>Lex-IA 2.0 Pro</span> - Inteligência Artificial aplicada ao Direito
     </div>
