@@ -80,20 +80,21 @@ if df is not None and api_key:
             st.session_state.historico.append({"pergunta": pergunta, "resposta": response.text})
             st.rerun() # Força o app a limpar a tela e mostrar o resultado novo
 
-    # --- ÁREA ÚNICA DE EXIBIÇÃO (SÓ APARECE UMA VEZ) ---
-    if st.session_state.ultima_resposta:
+    # --- ÁREA ÚNICA DE EXIBIÇÃO (ESTÁVEL E SEM REPETIÇÃO) ---
+    if st.session_state.get('ultima_resposta'):
         st.divider()
-        col1, col2 = st.columns([1, 4])
-        with col1:
-            if st.button("📋 Copiar"):
-                st.copy_to_clipboard(st.session_state.ultima_resposta)
-                st.toast("Copiado!", icon="✅")
-        
         st.markdown("### 📝 Parecer Técnico")
-        st.markdown(st.session_state.ultima_resposta)
         
-        with st.expander("🔗 Fontes Originais"):
-            for i in st.session_state.ultimos_indices:
+        # Orientação visual: retira o "mistério" de onde está o botão
+        st.info("💡 **Dica:** Para copiar o parecer, use o botão que aparece no canto superior direito da caixa cinza abaixo.")
+        
+        # Exibição segura e estável. O botão 'Copy' aparece nativamente aqui.
+        st.code(st.session_state.ultima_resposta, language="text")
+        
+        st.divider()
+        with st.expander("🔗 Ver Fontes Originais"):
+            indices_para_exibir = st.session_state.get('ultimos_indices', [])
+            for i in indices_para_exibir:
                 st.caption(df.iloc[i]['Conteúdo'])
 else:
     st.info("👋 Insira sua API Key para começar.")
