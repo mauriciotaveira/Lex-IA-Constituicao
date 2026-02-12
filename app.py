@@ -97,12 +97,23 @@ if df is not None and api_key:
                 st.markdown("### 📝 Parecer Técnico:")
                 st.write(response.text)
                 
-                # FUNÇÃO COPIAR (Usando componente de código para facilitar cópia nativa)
-                st.info("💡 Você pode copiar o parecer abaixo clicando no ícone no canto superior direito:")
-                st.code(response.text, language="text")
+                # --- EXIBIÇÃO DA RESPOSTA ---
+                st.markdown("### 📝 Parecer Técnico:")
+                st.write(response.text)
+                
+                # --- BOTÃO DE CÓPIA PROFISSIONAL ---
+                # Criamos uma linha com colunas para o botão ficar elegante
+                col_btn, col_space = st.columns([1, 2])
+                with col_btn:
+                    if st.button("📋 Copiar Parecer"):
+                        st.copy_to_clipboard(response.text)
+                        st.toast("Copiado com sucesso!", icon="✅")
+                
+                st.divider()
 
                 with st.expander("🔗 Fontes Originais"):
-                    for i in indices[:top_k]: st.caption(df.iloc[i]['Conteúdo'])
+                    for i in indices[:top_k]: 
+                        st.caption(df.iloc[i]['Conteúdo'])
                     
     except Exception as e: st.error(f"Erro: {e}")
 else:
