@@ -4,11 +4,13 @@ import google.generativeai as genai
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# --- 1. CONFIGURAÇÃO ---
+# --- 1. CONFIGURAÇÃO E IDENTIDADE ---
 st.set_page_config(page_title="Lex-IA 2.0 Pro", page_icon="⚖️", layout="wide")
 
+# Inicialização de Estados
 if 'historico' not in st.session_state: st.session_state.historico = []
 if 'ultima_resposta' not in st.session_state: st.session_state.ultima_resposta = None
+if 'primeiro_acesso' not in st.session_state: st.session_state.primeiro_acesso = True
 
 st.markdown("""
     <style>
@@ -26,7 +28,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. DADOS ---
+# --- 2. GESTÃO DA API KEY (SEGURANÇA) ---
+# Tenta pegar das Secrets do Streamlit, se não existir, usa o input da barra lateral
+api_key = st.secrets.get("GEMINI_API_KEY")
+
+# --- 3. MOTOR DE DADOS ---
 @st.cache_data
 def carregar_dados():
     try: return pd.read_excel("Constituicao_Mestra_V2.xlsx")
@@ -34,29 +40,40 @@ def carregar_dados():
 
 df = carregar_dados()
 
-# --- 3. SIDEBAR ---
+# --- 4. BOAS-VINDAS (SÓ UMA VEZ) ---
+if st.session_state.primeiro_acesso:
+    st.balloons()
+    st.toast("Bem-vindo ao Lex-IA 2.0 Pro, Maurício!", icon="🚀")
+    st.session_state.primeiro_acesso = False
+
+# --- 5. BARRA LATERAL ---
 with st.sidebar:
     st.markdown("### 🛠️ Lab de IA")
-    api_key = st.text_input("Sua Gemini Key", type="password")
+    # Só mostra o input se a chave não estiver configurada nas Secrets
+    if not api_key:
+        api_key = st.text_input("Insira sua Gemini Key", type="password")
+        st.warning("⚠️ Chave não detectada nas configurações do servidor.")
+    else:
+        st.success("✅ Sistema conectado via Secrets.")
+        
     top_k = st.slider("Profundidade da Análise", 1, 5, 3)
     st.divider()
-    st.markdown("### 📜 Histórico de Consultas")
+    st.markdown("### 📜 Histórico")
     for item in reversed(st.session_state.historico):
         with st.expander(f"🔍 {item['pergunta'][:20]}..."):
             st.write(item['resposta'])
 
-# --- 4. CORPO DO APP ---
+# --- 6. INTERFACE PRINCIPAL ---
 st.markdown('<p class="titulo-moderno">Lex-IA 2.0 Pro</p>', unsafe_allow_html=True)
 
 if df is not None and api_key:
     genai.configure(api_key=api_key)
     try:
         modelos = [m.name for m in genai.list_models() if "gemini" in m.name.lower()]
-        modelo_escolhido = st.selectbox("Escolha o motor da IA:", modelos)
+        modelo_escolhido = st.selectbox("Motor da IA:", modelos)
         st.divider()
         pergunta = st.text_input("O que você quer decifrar na Constituição hoje?")
 
-        # --- PROCESSAMENTO SILENCIOSO ---
         if st.button("Analisar Agora 🚀") and pergunta:
             with st.spinner('O Lex-IA está elaborando o parecer técnico...'):
                 vectorizer = TfidfVectorizer(
@@ -69,23 +86,24 @@ if df is not None and api_key:
                 indices = similares.argsort()[-10:][::-1]
                 contexto = "\n".join([f"Artigo: {df.iloc[i]['Conteúdo']}" for i in indices[:top_k]])
 
+                # PROMPT MULTILINGUE: A IA detecta e responde na língua do usuário
                 model = genai.GenerativeModel(modelo_escolhido)
-                prompt = f"Você é o Lex-IA 2.0, consultor jurídico sênior. Use tom executivo e cordial. Responda em tópicos. Contexto: {contexto}. Pergunta: {pergunta}"
+                prompt = (
+                    f"Você é o Lex-IA 2.0, consultor jurídico sênior. "
+                    f"IMPORTANTE: Responda obrigatoriamente no MESMO IDIOMA da pergunta do usuário. "
+                    f"Use tom executivo, cordial e em tópicos. Contexto: {contexto}. Pergunta: {pergunta}"
+                )
                 response = model.generate_content(prompt)
                 
-                # Guarda e reinicia para limpar a tela
                 st.session_state.ultima_resposta = response.text
                 st.session_state.indices_fontes = indices[:top_k]
                 st.session_state.historico.append({"pergunta": pergunta, "resposta": response.text})
                 st.rerun()
 
-        # --- ÁREA DE EXIBIÇÃO ÚNICA ---
         if st.session_state.ultima_resposta:
             st.divider()
             st.markdown("### 📝 Parecer Técnico")
-            st.info("💡 **Dica:** Para copiar o parecer abaixo, use o botão no canto superior direito da caixa cinza.")
-            
-            # Exibe o parecer apenas dentro da caixa de cópia para ser ultra-limpo
+            st.info("💡 **Dica:** Use o botão no canto superior direito da caixa cinza para copiar.")
             st.code(st.session_state.ultima_resposta, language="text")
             
             st.divider()
@@ -96,9 +114,9 @@ if df is not None and api_key:
     except Exception as e:
         st.error(f"Erro: {e}")
 else:
-    st.info("👋 Olá! Por favor, insira sua API Key na barra lateral para começar.")
+    st.info("👋 Olá! Por favor, insira sua API Key na barra lateral.")
 
-# --- 5. RODAPÉ ---
+# --- 7. RODAPÉ ---
 st.markdown("<br><br>", unsafe_allow_html=True)
 st.divider()
 st.markdown(
