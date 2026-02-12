@@ -155,15 +155,15 @@ else:
             for i in st.session_state.get('indices_fontes', []):
                 st.caption(df.iloc[i]['Conteúdo'])
 
-# --- 3. RODAPÉ (TOTALMENTE NA MARGEM ESQUERDA) ---
-st.markdown("<br><br>", unsafe_allow_html=True)
-st.divider()
-st.markdown(
-    """
-    <div style='text-align: center; color: #666; font-size: 0.9rem; padding: 20px;'>
+    # --- 3. RODAPÉ (TOTALMENTE NA MARGEM ESQUERDA) ---
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.divider()
+        st.markdown(
+        """
+        <div style='text-align: center; color: #666; font-size: 0.9rem; padding: 20px;'>
         Desenvolvido por <b>Maurício Taveira</b> | 2026 <br>
         <span style='color: #4facfe;'>Lex-IA 2.0 Pro</span> - Inteligência Artificial aplicada ao Direito
-    </div>
-    """,
-    unsafe_allow_html=True
+        </div>
+         """,
+        unsafe_allow_html=True
 )
