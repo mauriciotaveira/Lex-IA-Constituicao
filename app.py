@@ -101,19 +101,35 @@ if df is not None and api_key:
                 st.markdown("### 📝 Parecer Técnico:")
                 st.write(response.text)
                 
-                # --- BOTÃO DE CÓPIA PROFISSIONAL ---
-                # Criamos uma linha com colunas para o botão ficar elegante
-                col_btn, col_space = st.columns([1, 2])
-                with col_btn:
-                    if st.button("📋 Copiar Parecer"):
-                        st.copy_to_clipboard(response.text)
-                        st.toast("Copiado com sucesso!", icon="✅")
+                # --- GERADOR DA RESPOSTA (Dentro do botão Analisar) ---
+            with st.spinner('O Lex-IA está elaborando o parecer técnico...'):
+                model = genai.GenerativeModel(modelo_escolhido)
+                prompt = f"Você é o Lex-IA 2.0, consultor jurídico sênior. Use tom cordial e executivo, bullet points e negrito. Contexto: {contexto}. Pergunta: {pergunta}"
+                response = model.generate_content(prompt)
                 
-                st.divider()
+                # Salvamos tudo no estado da sessão (Session State)
+                st.session_state.ultima_resposta = response.text
+                st.session_state.indices_fontes = indices[:top_k]
+                st.session_state.historico.append({"pergunta": pergunta, "resposta": response.text})
 
-                with st.expander("🔗 Fontes Originais"):
-                    for i in indices[:top_k]: 
-                        st.caption(df.iloc[i]['Conteúdo'])
+        # --- ÁREA DE EXIBIÇÃO (Fora do bloco do botão, para evitar repetição) ---
+        if 'ultima_resposta' in st.session_state:
+            st.divider()
+            st.markdown("### 📝 Parecer Técnico")
+            
+            # 1. BOTÃO DE CÓPIA NO TOPO (Visibilidade Imediata)
+            if st.button("📋 Copiar Parecer"):
+                st.copy_to_clipboard(st.session_state.ultima_resposta)
+                st.toast("Parecer copiado com sucesso!", icon="✅")
+            
+            # 2. O TEXTO DO PARECER
+            st.markdown(st.session_state.ultima_resposta)
+            
+            # 3. FONTES NO FINAL (Para não poluir o visual)
+            st.divider()
+            with st.expander("🔗 Ver Fontes Originais"):
+                for i in st.session_state.indices_fontes:
+                    st.caption(df.iloc[i]['Conteúdo'])
                     
     except Exception as e: st.error(f"Erro: {e}")
 else:
