@@ -7,9 +7,9 @@ from sklearn.metrics.pairwise import cosine_similarity
 # --- 1. CONFIGURAÇÃO E ESTILO ---
 st.set_page_config(page_title="Lex-IA 2.0 Pro", page_icon="⚖️", layout="wide")
 
-# Inicializa o histórico na memória da sessão
-if 'historico' not in st.session_state:
-    st.session_state.historico = []
+# Inicializa estados de sessão
+if 'historico' not in st.session_state: st.session_state.historico = []
+if 'ultima_resposta' not in st.session_state: st.session_state.ultima_resposta = None
 
 st.markdown("""
     <style>
@@ -18,24 +18,16 @@ st.markdown("""
         background: -webkit-linear-gradient(#00f2fe, #4facfe);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        font-size: 3rem;
-        font-weight: 800;
+        font-size: 3rem; font-weight: 800;
     }
     .stButton>button {
         background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
-        color: white; border: none; border-radius: 12px; font-weight: bold;
-    }
-    .card-historico {
-        background-color: #1e2130;
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 10px;
-        border-left: 5px solid #4facfe;
+        color: white; border: none; border-radius: 12px; font-weight: bold; width: 100%;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. CARREGAMENTO ---
+# --- 2. MOTOR DE DADOS ---
 @st.cache_data
 def carregar_dados():
     try: return pd.read_excel("Constituicao_Mestra_V2.xlsx")
@@ -48,32 +40,25 @@ with st.sidebar:
     st.markdown("### 🛠️ Lab de IA")
     api_key = st.text_input("Sua Gemini Key", type="password")
     top_k = st.slider("Profundidade", 1, 5, 3)
-    
     st.divider()
-    st.markdown("### 📜 Histórico de Consultas")
-    if not st.session_state.historico:
-        st.caption("Nenhuma consulta realizada ainda.")
-    else:
-        for idx, item in enumerate(reversed(st.session_state.historico)):
-            with st.expander(f"🔍 {item['pergunta'][:30]}..."):
-                st.write(item['resposta'])
-                if st.button("Limpar este", key=f"del_{idx}"):
-                    st.session_state.historico.pop(len(st.session_state.historico) - 1 - idx)
-                    st.rerun()
+    st.markdown("### 📜 Histórico")
+    for item in reversed(st.session_state.historico):
+        with st.expander(f"🔍 {item['pergunta'][:20]}..."):
+            st.write(item['resposta'])
 
 # --- 4. INTERFACE PRINCIPAL ---
 st.markdown('<p class="titulo-moderno">Lex-IA 2.0 Pro</p>', unsafe_allow_html=True)
 
 if df is not None and api_key:
     genai.configure(api_key=api_key)
-    try:
-        modelos = [m.name for m in genai.list_models() if "gemini" in m.name.lower()]
-        modelo_escolhido = st.selectbox("Motor da IA:", modelos)
-        
-        st.divider()
-        pergunta = st.text_input("O que deseja decifrar na Constituição?")
+    modelos = [m.name for m in genai.list_models() if "gemini" in m.name.lower()]
+    modelo_escolhido = st.selectbox("Motor da IA:", modelos)
+    
+    pergunta = st.text_input("O que deseja decifrar na Constituição?")
 
-        if st.button("Analisar Agora 🚀") and pergunta:
+    # --- LÓGICA DE PROCESSAMENTO (NÃO EXIBE NADA AQUI) ---
+    if st.button("Analisar Agora 🚀") and pergunta:
+        with st.spinner('O Lex-IA está elaborando o parecer...'):
             # Busca RAG Turbo
             vectorizer = TfidfVectorizer(
                 stop_words=['de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'uma', 'os', 'as', 'no', 'na', 'artigo', 'parágrafo', 'inciso', 'constituição', 'regras', 'sobre'],
@@ -85,52 +70,30 @@ if df is not None and api_key:
             indices = similares.argsort()[-10:][::-1]
             contexto = "\n".join([f"Artigo: {df.iloc[i]['Conteúdo']}" for i in indices[:top_k]])
 
-            with st.spinner('Elaborando parecer...'):
-                model = genai.GenerativeModel(modelo_escolhido)
-                prompt = f"Você é o Lex-IA 2.0, consultor jurídico sênior. Use tom cordial e executivo, bullet points e negrito. Contexto: {contexto}. Pergunta: {pergunta}"
-                response = model.generate_content(prompt)
-                
-                # Salva no Histórico
-                st.session_state.historico.append({"pergunta": pergunta, "resposta": response.text})
-                
-                # Exibe Resposta
-                st.markdown("### 📝 Parecer Técnico:")
-                st.write(response.text)
-                
-                # --- EXIBIÇÃO DA RESPOSTA ---
-                st.markdown("### 📝 Parecer Técnico:")
-                st.write(response.text)
-                
-                # --- GERADOR DA RESPOSTA (Dentro do botão Analisar) ---
-            with st.spinner('O Lex-IA está elaborando o parecer técnico...'):
-                model = genai.GenerativeModel(modelo_escolhido)
-                prompt = f"Você é o Lex-IA 2.0, consultor jurídico sênior. Use tom cordial e executivo, bullet points e negrito. Contexto: {contexto}. Pergunta: {pergunta}"
-                response = model.generate_content(prompt)
-                
-                # Salvamos tudo no estado da sessão (Session State)
-                st.session_state.ultima_resposta = response.text
-                st.session_state.indices_fontes = indices[:top_k]
-                st.session_state.historico.append({"pergunta": pergunta, "resposta": response.text})
+            model = genai.GenerativeModel(modelo_escolhido)
+            prompt = f"Você é o Lex-IA 2.0, consultor sênior. Responda de forma executiva, polida e em tópicos. Contexto: {contexto}. Pergunta: {pergunta}"
+            response = model.generate_content(prompt)
+            
+            # SALVAMENTO SILENCIOSO
+            st.session_state.ultima_resposta = response.text
+            st.session_state.ultimos_indices = indices[:top_k]
+            st.session_state.historico.append({"pergunta": pergunta, "resposta": response.text})
+            st.rerun() # Força o app a limpar a tela e mostrar o resultado novo
 
-        # --- ÁREA DE EXIBIÇÃO (Fora do bloco do botão, para evitar repetição) ---
-        if 'ultima_resposta' in st.session_state:
-            st.divider()
-            st.markdown("### 📝 Parecer Técnico")
-            
-            # 1. BOTÃO DE CÓPIA NO TOPO (Visibilidade Imediata)
-            if st.button("📋 Copiar Parecer"):
+    # --- ÁREA ÚNICA DE EXIBIÇÃO (SÓ APARECE UMA VEZ) ---
+    if st.session_state.ultima_resposta:
+        st.divider()
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("📋 Copiar"):
                 st.copy_to_clipboard(st.session_state.ultima_resposta)
-                st.toast("Parecer copiado com sucesso!", icon="✅")
-            
-            # 2. O TEXTO DO PARECER
-            st.markdown(st.session_state.ultima_resposta)
-            
-            # 3. FONTES NO FINAL (Para não poluir o visual)
-            st.divider()
-            with st.expander("🔗 Ver Fontes Originais"):
-                for i in st.session_state.indices_fontes:
-                    st.caption(df.iloc[i]['Conteúdo'])
-                    
-    except Exception as e: st.error(f"Erro: {e}")
+                st.toast("Copiado!", icon="✅")
+        
+        st.markdown("### 📝 Parecer Técnico")
+        st.markdown(st.session_state.ultima_resposta)
+        
+        with st.expander("🔗 Fontes Originais"):
+            for i in st.session_state.ultimos_indices:
+                st.caption(df.iloc[i]['Conteúdo'])
 else:
     st.info("👋 Insira sua API Key para começar.")
