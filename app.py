@@ -5,7 +5,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 # --- 1. CONFIGURAÇÃO ---
-st.set_page_config(page_title="Lex-IA 2.0 Pro", page_icon="⚖️", layout="wide")
+st.set_page_config(page_title="Guia Cidadão. Constituição descomplicada", page_icon="⚖️", layout="wide")
 
 if 'historico' not in st.session_state: st.session_state.historico = []
 if 'ultima_resposta' not in st.session_state: st.session_state.ultima_resposta = None
