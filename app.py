@@ -51,7 +51,7 @@ df = carregar_dados()
 # --- 4. BOAS-VINDAS ---
 if st.session_state.primeiro_acesso:
     st.balloons()
-    st.toast("Habite-se concedido! Lex-IA 2.0 Pro ativo.", icon="🚀")
+    st.toast("Habite-se concedido! Guia Cidadão. Constituição descomplicada.", icon="🚀")
     st.session_state.primeiro_acesso = False
 
 # --- 5. SIDEBAR ---
