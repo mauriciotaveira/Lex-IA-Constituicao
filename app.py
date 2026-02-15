@@ -69,7 +69,7 @@ with st.sidebar:
             st.write(item['resposta'])
 
 # --- 6. INTERFACE PRINCIPAL ---
-st.markdown('<p class="titulo-moderno">Lex-IA 2.0 Pro</p>', unsafe_allow_html=True)
+st.markdown('<p class="titulo-moderno">Guia Cidadão. Constituição descomplicada.</p>', unsafe_allow_html=True)
 
 if df is not None and api_key:
     genai.configure(api_key=api_key)
