@@ -5,24 +5,60 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 # --- 1. CONFIGURAÇÃO ---
-st.set_page_config(page_title="Guia Cidadão. Constituição descomplicada", page_icon="⚖️", layout="wide")
+st.set_page_config(page_title="Guia Cidadão", page_icon="⚖️", layout="wide")
 
+# Mantemos o histórico (NÃO APAGUE ISSO)
 if 'historico' not in st.session_state: st.session_state.historico = []
 if 'ultima_resposta' not in st.session_state: st.session_state.ultima_resposta = None
 if 'primeiro_acesso' not in st.session_state: st.session_state.primeiro_acesso = True
 
+# --- NOVO ESTILO VISUAL (PRETO E BOLD) ---
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; color: #ffffff; }
-    .titulo-moderno {
-        background: -webkit-linear-gradient(#00f2fe, #4facfe);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-size: 3rem; font-weight: 800;
+    /* Ajuste do Fundo (Branco) e Texto (Preto) */
+    .main { background-color: #ffffff; color: #000000; }
+    
+    /* Estilo do Título Principal (Guia Cidadão) */
+    .titulo-cidadao {
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        color: #000000;      /* Preto Puro */
+        font-size: 3.5rem;   /* Tamanho Grande */
+        font-weight: 900;    /* Negrito Extra Forte */
+        margin-bottom: 0px;  /* Grudado no subtítulo */
+        line-height: 1.1;
     }
+    
+    /* Estilo do Subtítulo */
+    .subtitulo-cidadao {
+        color: #444444;      /* Cinza Escuro */
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 25px;
+    }
+
+    /* Caixa de Dica/Convite */
+    .convite-pesquisa {
+        background-color: #f0f2f6; /* Cinza clarinho */
+        padding: 15px;
+        border-radius: 8px;
+        border-left: 6px solid #000; /* Borda preta grossa */
+        color: #333;
+        font-size: 1.1rem;
+        margin-bottom: 30px;
+    }
+
+    /* Botão Preto Sóbrio */
     .stButton>button {
-        background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
-        color: white; border: none; border-radius: 12px; font-weight: bold; width: 100%;
+        background-color: #000000 !important;
+        color: white !important;
+        border: none;
+        border-radius: 8px;
+        font-weight: bold;
+        width: 100%;
+        height: 50px;
+    }
+    .stButton>button:hover {
+        background-color: #333333 !important; /* Cinza escuro ao passar o mouse */
     }
     </style>
     """, unsafe_allow_html=True)
@@ -51,7 +87,13 @@ df = carregar_dados()
 # --- 4. BOAS-VINDAS ---
 if st.session_state.primeiro_acesso:
     st.balloons()
-    st.toast("Habite-se concedido! Guia Cidadão. Constituição descomplicada.", icon="🚀")
+    # Texto mais simples e direto:
+    st.toast("Seja bem-vindo(a) ao Guia Cidadão!", icon="🇧🇷")
+    st.session_state.primeiro_acesso = False# --- 4. BOAS-VINDAS ---
+if st.session_state.primeiro_acesso:
+    st.balloons()
+    # Texto mais simples e direto:
+    st.toast("Seja bem-vindo(a) ao Guia Cidadão!", icon="🇧🇷")
     st.session_state.primeiro_acesso = False
 
 # --- 5. SIDEBAR ---
@@ -68,9 +110,14 @@ with st.sidebar:
         with st.expander(f"🔍 {item['pergunta'][:20]}..."):
             st.write(item['resposta'])
 
-# --- 6. INTERFACE PRINCIPAL ---
-st.markdown('<p class="titulo-moderno">Guia Cidadão. Constituição descomplicada.</p>', unsafe_allow_html=True)
+# Título Principal (Grande e Preto)
+st.markdown('<div class="titulo-cidadao">Guia Cidadão</div>', unsafe_allow_html=True)
 
+# Subtítulo (Menor e Cinza)
+st.markdown('<div class="subtitulo-cidadao">Constituição Descomplicada</div>', unsafe_allow_html=True)
+
+# Caixa de Dica (Para incentivar o usuário)
+st.markdown('<div class="convite-pesquisa">💡 <b>Dica:</b> Pergunte coisas como "tenho direito a férias?" ou "o que é liberdade de expressão?".</div>', unsafe_allow_html=True)
 if df is not None and api_key:
     genai.configure(api_key=api_key)
     try:
