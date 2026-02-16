@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 import os
+import unicodedata
 
 # --- 1. CONFIGURAÇÃO ---
 st.set_page_config(page_title="Guia Cidadão", page_icon="⚖️", layout="wide")
@@ -69,23 +70,28 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DADOS ---
+# --- 3. DADOS E FUNÇÕES AUXILIARES ---
 @st.cache_data
 def carregar_constitucional():
     arquivos = [f for f in os.listdir() if f.endswith('.xlsx')]
     if not arquivos: return None
     try:
         df = pd.read_excel(arquivos[0])
-        return df.fillna("")
+        # Garante que tudo vire texto para a busca não falhar
+        return df.fillna("").astype(str)
     except: return None
+
+def normalizar_texto(texto):
+    # Remove acentos e deixa minúsculo (para busca funcionar: é = e)
+    if not isinstance(texto, str): return str(texto).lower()
+    nfkd = unicodedata.normalize('NFKD', texto)
+    return "".join([c for c in nfkd if not unicodedata.combining(c)]).lower()
 
 df = carregar_constitucional()
 
-# --- 4. SIDEBAR (LIMPA E AUTOMÁTICA) ---
+# --- 4. SIDEBAR (STATUS) ---
 with st.sidebar:
     st.header("⚖️ Status do Sistema")
-    
-    # Tenta pegar a chave automaticamente
     api_key = st.secrets.get("GOOGLE_API_KEY")
     
     if api_key:
@@ -106,25 +112,51 @@ with st.sidebar:
         with st.expander(f"❓ {p[:25]}..."):
             st.caption(r[:100] + "...")
 
-# --- 5. LÓGICA RAG (CALIBRADA PARA EXCELÊNCIA) ---
+# --- 5. LÓGICA RAG INTELIGENTE (RANKING) ---
 def buscar_resposta(pergunta):
     if df is None: return "⚠️ Erro: A Constituição (Excel) não foi carregada."
     if not api_key: return "⚠️ Erro: Chave de segurança não configurada."
     
-    # 1. Recuperação (Retrieval)
-    palavras = pergunta.lower().split()
-    # Filtro simples para achar artigos relevantes
-    mask = df.astype(str).apply(lambda x: x.str.lower()).apply(lambda x: any(p in x.values for p in palavras if len(p)>3), axis=1)
+    # 1. Recuperação Inteligente (Smart Retrieval)
     
-    # Pega até 15 artigos para dar bastante contexto
-    contexto = df[mask].head(15).to_string()
+    # Lista de palavras para IGNORAR (Stopwords)
+    ignorar = ['quais', 'sao', 'os', 'as', 'de', 'do', 'da', 'em', 'que', 'para', 'com', 'conforme', 'constituição', 'artigo', 'lei']
     
-    # 2. Geração (Generation) - PROMPT "PREMIUM"
+    pergunta_norm = normalizar_texto(pergunta)
+    palavras_chave = [p for p in pergunta_norm.split() if p not in ignorar and len(p) > 2]
+    
+    if not palavras_chave:
+        # Se a pessoa digitou só palavras comuns, usa tudo
+        palavras_chave = pergunta_norm.split()
+
+    # Função de Pontuação (Ranking)
+    # Conta quantas palavras-chave aparecem em cada linha do Excel
+    def pontuar_linha(linha):
+        texto_linha = normalizar_texto(str(linha))
+        pontos = 0
+        for p in palavras_chave:
+            if p in texto_linha:
+                pontos += 1
+        return pontos
+
+    # Aplica a pontuação em todas as linhas
+    df['score'] = df.apply(lambda row: pontuar_linha(row.values), axis=1)
+    
+    # Pega as 10 melhores linhas (maior pontuação)
+    # Se ninguém pontuar, pega as 5 primeiras por garantia
+    melhores = df[df['score'] > 0].sort_values('score', ascending=False).head(15)
+    
+    if melhores.empty:
+        contexto = df.head(5).to_string() # Fallback
+    else:
+        contexto = melhores.to_string()
+    
+    # 2. Geração (Generation) - PROMPT PREMIUM
     modelo = genai.GenerativeModel('gemini-2.5-flash')
     
     prompt = f"""
     Atue como um Consultor Jurídico Sênior, especialista em Direito Constitucional Brasileiro.
-    Seu objetivo é explicar a lei de forma didática, completa e acolhedora para um cidadão comum.
+    Seu objetivo é explicar a lei de forma didática, completa e acolhedora.
     
     Use EXCLUSIVAMENTE estes trechos da Constituição para embasar sua resposta:
     {contexto}
@@ -133,16 +165,16 @@ def buscar_resposta(pergunta):
     
     Estrutura da Resposta:
     1. **Resumo Direto:** Responda a dúvida de forma clara em um parágrafo.
-    2. **O que diz a Lei:** Cite os artigos ou incisos encontrados (use o contexto acima).
-    3. **Explicação Descomplicada:** Traduza o "juridiquês" para uma linguagem do dia a dia.
-    4. **Conclusão:** Finalize com uma orientação prática, se houver.
+    2. **O que diz a Lei:** Cite o Artigo/Inciso exato (Ex: Art. 5º, Art. 6º) encontrado no contexto.
+    3. **Explicação Descomplicada:** Traduza o termo jurídico para linguagem simples.
+    4. **Conclusão:** Finalize com uma orientação prática.
     
-    Se o assunto não estiver nos trechos fornecidos, diga honestamente: "Não encontrei um artigo específico sobre isso nos trechos da Constituição que consultei agora, mas posso analisar outro tema."
+    Se não encontrar a resposta no contexto, diga: "Não encontrei esse tema específico nos trechos analisados."
     """
     
     try:
-        # Temperatura 0.4: Equilíbrio perfeito entre precisão (lei) e fluidez (texto bom)
-        res = modelo.generate_content(prompt, generation_config={'temperature': 0.4})
+        # Temperatura 0.3 para ser mais fiel ao texto da lei
+        res = modelo.generate_content(prompt, generation_config={'temperature': 0.3})
         return res.text
     except Exception as e:
         return f"Erro na IA: {e}"
@@ -154,7 +186,7 @@ st.markdown('<div class="subtitulo-cidadao">Constituição Descomplicada</div>',
 st.markdown('''
 <div class="convite-pesquisa">
     💡 <b>Dica:</b> A IA analisa a Constituição em tempo real. 
-    Pergunte: "Tenho direito a férias?", "O que é liberdade de expressão?" ou "Quais são os direitos dos trabalhadores?".
+    Pergunte: "Tenho direito a férias?", "O que é liberdade de expressão?" ou "Quais são os direitos sociais?".
 </div>
 ''', unsafe_allow_html=True)
 
